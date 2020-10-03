@@ -7,23 +7,25 @@ generate_data <- function(args) {
     # convert adjacency matrix to Graph object
     A <- read.table(args$adjacency_matrix, sep='\t')
     d <- dim(A)[1]
-    print(d)
 
-    # G <- adj2graph(A)
-    # print(G)
+    G <- adj2graph(A)
+    print(G)
 
     # fit precision matrix to graph (TODO: explain how this works)
     # see https://stats.stackexchange.com/q/295093 for basics
-    # P <- graph2prec(G)
+    P <- graph2prec(G)
+    print(P)
 
     # get covariance matrix (inverse of precision matrix)
-    # Sigma <- solve(P)
+    Sigma <- solve(P)
+    print(Sigma)
 
     # generate data from MVN with 0 mean and given covariance
-    # X <- mvrnorm(n=n, rep(0, d), Sigma)
+    X <- mvrnorm(n=args$n, rep(0, d), Sigma)
+    print(cov(X))
 
     # write data to file
-    # write.table(X, file=args$output_file, sep='\t', row.names=F, col.names=F)
+	write.table(X, file=args$output_file, sep='\t', row.names=F, col.names=F)
 
 }
 

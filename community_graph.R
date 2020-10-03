@@ -179,6 +179,14 @@ make_graph <- function(method, D, e, enforce=TRUE, ...) {
     return(structure(Graph, class='graph'))
 }
 
+#' Procedure to get a Graph object from an adjacency matrix
+#' @param adj_matrix a dataframe describing the adjacency matrix
+#' @export
+adj2graph <- function(adj_matrix) {
+    Graph <- data.matrix(adj_matrix)
+    return(structure(Graph, class='graph'))
+}
+
 #' @noRd
 enforceE <- function(Graph, e) {
 
