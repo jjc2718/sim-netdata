@@ -7,8 +7,25 @@ def graph_to_precision_matrix(adj_matrix,
                               eps_bin=1e-2,
                               num_binary_search=100):
 
+    """Find a precision matrix corresponding to a binary graph.
+
+    Arguments
+    --------
+    adj_matrix (np.array): binary adjacency matrix
+    pos_lims (tuple): positive limits to sample partial correlations from
+    neg_lims (tuple): negative limits to sample partial correlations from
+    target_condition (int): target condition number for added diagonal weight
+    eps_bin (float): convergence condition for condition number search
+    num_binary_search (int): max number of search iterations
+
+    Returns
+    -------
+    theta (np.array): precision matrix (inverse covariance matrix) corresponding
+                      to the input graph
+    """
+
     assert len(pos_lims) == 2 and len(neg_lims) == 2, (
-            'sampling limits should have length 1 or 2')
+            'sampling limits should have length 2')
 
     n = adj_matrix.shape[1]
     pos_lims = sorted(pos_lims)
@@ -39,19 +56,25 @@ def graph_to_precision_matrix(adj_matrix,
     theta[triu_ix] = utri[triu_ix]
     theta[tril_ix] = utri[triu_ix]
 
-    # find smallest eigenvalue such that theta is invertible
+    # make sure smallest eigenvalue of matrix isn't 0 (or close to 0)
+    # since theta is symmetric, eigenvalues determine condition number
     evals = np.linalg.eig(theta)[0]
     min_eig, max_eig = evals.min(), evals.max()
     if min_eig < 1e-2:
         theta = theta + (abs(min_eig) * np.eye(n))
-    diag_constant = bin_search_condition(theta, target_condition,
-                                         num_binary_search, eps_bin)
+
+    # now find the smallest constant to add to the diagonal to satisfy
+    # the desired condition number
+    diag_constant = _bin_search_condition(theta, target_condition,
+                                          num_binary_search, eps_bin)
     theta = theta + (diag_constant * np.eye(n))
 
     return theta
 
-def bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
-    """TODO document this"""
+def _bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
+    """Perform a binary search to find the smallest diagonal weight that
+    will bring the condition number of theta under target_cond.
+    """
 
     n = theta.shape[0]
     curr_cond = np.linalg.cond(theta)
@@ -94,5 +117,6 @@ if __name__ == '__main__':
                            [0, 1, 0]])
     theta = graph_to_precision_matrix(adj_matrix)
     print(theta)
+    print(np.linalg.inv(theta))
     print(np.linalg.cond(theta))
 
