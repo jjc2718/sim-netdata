@@ -75,16 +75,22 @@ def _bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
     """Perform a binary search to find the smallest diagonal weight that
     will bring the condition number of theta under target_cond.
     """
-
     n = theta.shape[0]
     curr_cond = np.linalg.cond(theta)
 
     if curr_cond < target_cond:
         curr_lb = -np.diag(theta).max()
-        step_size = curr_lb + np.finfo(type(theta)).eps
+        step_size = curr_lb + np.finfo(theta.dtype).eps
         while curr_cond < target_cond:
+            last_cond = curr_cond
             curr_cond = np.linalg.cond(theta + (step_size * np.eye(n)))
             step_size = step_size / 2
+            if last_cond > curr_cond:
+                # if repeated updates are decreasing the condition number,
+                # we can stop modifying the diagonal (since the original
+                # matrix has a low condition number already)
+                curr_cond = last_cond
+                break
         curr_ub = step_size
 
     else:
@@ -112,11 +118,13 @@ def _bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
 
 
 if __name__ == '__main__':
-    adj_matrix = np.array([[0, 1, 0],
-                           [1, 0, 1],
-                           [0, 1, 0]])
+    adj_matrix = np.array([[0, 1, 0, 1],
+                           [1, 0, 1, 0],
+                           [0, 1, 0, 1],
+                           [1, 0, 1, 0]])
     theta = graph_to_precision_matrix(adj_matrix)
     print(theta)
     print(np.linalg.inv(theta))
+    print(theta @ np.linalg.inv(theta))
     print(np.linalg.cond(theta))
 
