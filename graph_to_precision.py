@@ -78,15 +78,12 @@ def graph_to_precision_matrix(adj_matrix,
                                           num_binary_search, eps_bin)
     theta = theta + (diag_constant * np.eye(n))
 
-    # test making theta diagonal negative
-    # theta = theta - (2 * (np.diag(np.diag(theta))))
-
     return theta
 
 
 def _bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
     """Perform a binary search to find the smallest diagonal weight that
-    will bring the condition number of theta under target_cond.
+    will make the condition number of theta less than target_cond.
     """
     n = theta.shape[0]
     curr_cond = np.linalg.cond(theta)
