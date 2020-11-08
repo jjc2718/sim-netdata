@@ -13,7 +13,8 @@ def graph_to_precision_matrix(adj_matrix,
     --------
     adj_matrix (np.array): binary adjacency matrix
     pos_lims (tuple): positive limits to sample partial correlations from
-    neg_lims (tuple): negative limits to sample partial correlations from
+    neg_lims (tuple): negative limits to sample partial correlations from,
+                      if None sample only from pos_lims
     target_condition (int): target condition number for added diagonal weight
     eps_bin (float): convergence condition for condition number search
     num_binary_search (int): max number of search iterations
@@ -32,29 +33,30 @@ def graph_to_precision_matrix(adj_matrix,
     neg_lims = sorted(neg_lims)
 
     # add diagonal to adjacency matrix
-    theta = adj_matrix + np.eye(n)
+    # theta = adj_matrix + np.eye(n)
     # get degree of each node
     degree_vec = np.sum(adj_matrix, axis=0)
 
     # get locations of (binary) edges in graph
-    utri = np.triu(theta, k=1)
+    utri = np.triu(adj_matrix, k=1).astype(float)
     nzind = (utri != 0)
 
     # replace binary edges with positive or negative edge weights at random,
     # sampled from the ranges given
     nnz = np.count_nonzero(nzind)
-    rands = np.zeros(shape=(nnz,))
-    boolind = np.random.choice([True, False], size=nnz)
-    rands[boolind] = np.random.uniform(low=pos_lims[0], high=pos_lims[1],
-                                       size=(np.count_nonzero(boolind),))
-    rands[~boolind] = np.random.uniform(low=neg_lims[0], high=neg_lims[1],
-                                        size=(np.count_nonzero(~boolind),))
+    if neg_lims is None:
+        rands = np.random.uniform(low=pos_lims[0], high=pos_lims[1],
+                                  size=(nnz,))
+    else:
+        rands = np.zeros(shape=(nnz,))
+        boolind = np.random.choice([True, False], size=nnz)
+        rands[boolind] = np.random.uniform(low=pos_lims[0], high=pos_lims[1],
+                                           size=(np.count_nonzero(boolind),))
+        rands[~boolind] = np.random.uniform(low=neg_lims[0], high=neg_lims[1],
+                                            size=(np.count_nonzero(~boolind),))
     utri[nzind] = rands
 
-    triu_ix = np.triu_indices(theta.shape[0], 1)
-    tril_ix = np.tril_indices(theta.shape[0], -1)
-    theta[triu_ix] = utri[triu_ix]
-    theta[tril_ix] = utri[triu_ix]
+    theta = np.eye(n) + _copy_triu_to_tril(utri)
 
     # make sure smallest eigenvalue of matrix isn't 0 (or close to 0)
     # since theta is symmetric, eigenvalues determine condition number
@@ -70,6 +72,7 @@ def graph_to_precision_matrix(adj_matrix,
     theta = theta + (diag_constant * np.eye(n))
 
     return theta
+
 
 def _bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
     """Perform a binary search to find the smallest diagonal weight that
@@ -117,12 +120,21 @@ def _bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
     return diag_const
 
 
+def _copy_triu_to_tril(arr):
+    """Copy upper triangle of array to lower triangle, leaving diagonal.
+
+    Note this overwrites the lower triangle of the existing array.
+    """
+    return arr + arr.T - np.diag(np.diag(arr))
+
+
 if __name__ == '__main__':
-    adj_matrix = np.array([[0, 1, 0, 1],
+    adj_matrix = np.array([[0, 1, 0, 0],
                            [1, 0, 1, 0],
-                           [0, 1, 0, 1],
-                           [1, 0, 1, 0]])
+                           [0, 1, 0, 0],
+                           [0, 0, 0, 0]])
     theta = graph_to_precision_matrix(adj_matrix)
+    # theta = graph_to_precision_matrix(adj_matrix, neg_lims=None)
     print(theta)
     print(np.linalg.inv(theta))
     print(theta @ np.linalg.inv(theta))
