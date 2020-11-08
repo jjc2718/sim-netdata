@@ -25,12 +25,17 @@ def graph_to_precision_matrix(adj_matrix,
                       to the input graph
     """
 
-    assert len(pos_lims) == 2 and len(neg_lims) == 2, (
-            'sampling limits should have length 2')
+    if neg_lims is None:
+        assert len(pos_lims) == 2, (
+                'sampling limits should have length 2')
+        pos_lims = sorted(pos_lims)
+    else:
+        assert len(pos_lims) == 2 and len(neg_lims) == 2, (
+                'sampling limits should have length 2')
+        pos_lims = sorted(pos_lims)
+        neg_lims = sorted(neg_lims)
 
     n = adj_matrix.shape[1]
-    pos_lims = sorted(pos_lims)
-    neg_lims = sorted(neg_lims)
 
     # add diagonal to adjacency matrix
     # theta = adj_matrix + np.eye(n)
@@ -133,8 +138,11 @@ if __name__ == '__main__':
                            [1, 0, 1, 0],
                            [0, 1, 0, 0],
                            [0, 0, 0, 0]])
-    theta = graph_to_precision_matrix(adj_matrix)
-    # theta = graph_to_precision_matrix(adj_matrix, neg_lims=None)
+    # theta = graph_to_precision_matrix(adj_matrix)
+    theta = graph_to_precision_matrix(adj_matrix,
+                                      pos_lims=(0.5, 1),
+                                      neg_lims=None,
+                                      target_condition=10)
     print(theta)
     print(np.linalg.inv(theta))
     print(theta @ np.linalg.inv(theta))
