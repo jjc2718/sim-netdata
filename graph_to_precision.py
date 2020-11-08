@@ -2,7 +2,7 @@ import numpy as np
 
 def graph_to_precision_matrix(adj_matrix,
                               pos_lims=(2, 3),
-                              neg_lims=(-2, -3),
+                              neg_lims=(-3, -2),
                               target_condition=100,
                               eps_bin=1e-2,
                               num_binary_search=100):
@@ -12,9 +12,11 @@ def graph_to_precision_matrix(adj_matrix,
     Arguments
     --------
     adj_matrix (np.array): binary adjacency matrix
-    pos_lims (tuple): positive limits to sample partial correlations from
-    neg_lims (tuple): negative limits to sample partial correlations from,
-                      if None sample only from pos_lims
+    pos_lims (tuple): positive limits to sample elements of precision matrix
+                      from, if None sample only from neg_lims
+    neg_lims (tuple): negative limits to sample elements of precision matrix
+                      from. Note that negative precision matrix elements
+                      correspond to positive correlations.
     target_condition (int): target condition number for added diagonal weight
     eps_bin (float): convergence condition for condition number search
     num_binary_search (int): max number of search iterations
@@ -25,10 +27,10 @@ def graph_to_precision_matrix(adj_matrix,
                       to the input graph
     """
 
-    if neg_lims is None:
-        assert len(pos_lims) == 2, (
+    if pos_lims is None:
+        assert len(neg_lims) == 2, (
                 'sampling limits should have length 2')
-        pos_lims = sorted(pos_lims)
+        neg_lims = sorted(neg_lims)
     else:
         assert len(pos_lims) == 2 and len(neg_lims) == 2, (
                 'sampling limits should have length 2')
@@ -49,8 +51,8 @@ def graph_to_precision_matrix(adj_matrix,
     # replace binary edges with positive or negative edge weights at random,
     # sampled from the ranges given
     nnz = np.count_nonzero(nzind)
-    if neg_lims is None:
-        rands = np.random.uniform(low=pos_lims[0], high=pos_lims[1],
+    if pos_lims is None:
+        rands = np.random.uniform(low=neg_lims[0], high=neg_lims[1],
                                   size=(nnz,))
     else:
         rands = np.zeros(shape=(nnz,))
@@ -75,6 +77,9 @@ def graph_to_precision_matrix(adj_matrix,
     diag_constant = _bin_search_condition(theta, target_condition,
                                           num_binary_search, eps_bin)
     theta = theta + (diag_constant * np.eye(n))
+
+    # test making theta diagonal negative
+    # theta = theta - (2 * (np.diag(np.diag(theta))))
 
     return theta
 
@@ -134,14 +139,13 @@ def _copy_triu_to_tril(arr):
 
 
 if __name__ == '__main__':
-    adj_matrix = np.array([[0, 1, 0, 0],
-                           [1, 0, 1, 0],
-                           [0, 1, 0, 0],
+    adj_matrix = np.array([[0, 1, 1, 0],
+                           [1, 0, 0, 0],
+                           [1, 0, 0, 0],
                            [0, 0, 0, 0]])
-    # theta = graph_to_precision_matrix(adj_matrix)
     theta = graph_to_precision_matrix(adj_matrix,
-                                      pos_lims=(0.5, 1),
-                                      neg_lims=None,
+                                      pos_lims=None,
+                                      neg_lims=(-0.5, -1.0),
                                       target_condition=10)
     print(theta)
     print(np.linalg.inv(theta))
