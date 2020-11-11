@@ -36,7 +36,7 @@ def graph_to_pcorr(adj_matrix,
         pos_lims = sorted(pos_lims)
         neg_lims = sorted(neg_lims)
 
-    n = adj_matrix.shape[1]
+    n = adj_matrix.shape[0]
 
     # get degree of each node
     degree_vec = np.sum(adj_matrix, axis=0)
@@ -92,6 +92,7 @@ def pcorr_to_prec(theta,
     """
     # make sure smallest eigenvalue of matrix isn't 0 (or close to 0)
     # since theta is symmetric, eigenvalues determine condition number
+    n = theta.shape[0]
     evals = np.linalg.eig(theta)[0]
     min_eig, max_eig = evals.min(), evals.max()
     if min_eig < 1e-2:
