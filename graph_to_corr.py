@@ -1,13 +1,12 @@
 import numpy as np
 
-def graph_to_precision_matrix(adj_matrix,
-                              pos_lims=(2, 3),
-                              neg_lims=(-3, -2),
-                              target_condition=100,
-                              eps_bin=1e-2,
-                              num_binary_search=100):
+def graph_to_pcorr(adj_matrix,
+                   pos_lims=None,
+                   neg_lims=(-1, 0)):
+    """Convert a binary graph to a (partial) correlation matrix.
 
-    """Find a precision matrix corresponding to a binary graph.
+    This is done by sampling from neg_lims (or pos_lims if provided), and
+    adding ones to the diagonal.
 
     Arguments
     --------
@@ -17,20 +16,20 @@ def graph_to_precision_matrix(adj_matrix,
     neg_lims (tuple): negative limits to sample elements of precision matrix
                       from. Note that negative precision matrix elements
                       correspond to positive correlations.
-    target_condition (int): target condition number for added diagonal weight
-    eps_bin (float): convergence condition for condition number search
-    num_binary_search (int): max number of search iterations
 
     Returns
     -------
-    theta (np.array): precision matrix (inverse covariance matrix) corresponding
+    theta (np.array): matrix of correlations/partial correlations corresponding
                       to the input graph
     """
-
     if pos_lims is None:
         assert len(neg_lims) == 2, (
                 'sampling limits should have length 2')
         neg_lims = sorted(neg_lims)
+    elif neg_lims is None:
+        assert len(pos_lims) == 2, (
+                'sampling limits should have length 2')
+        pos_lims = sorted(pos_lims)
     else:
         assert len(pos_lims) == 2 and len(neg_lims) == 2, (
                 'sampling limits should have length 2')
@@ -39,8 +38,6 @@ def graph_to_precision_matrix(adj_matrix,
 
     n = adj_matrix.shape[1]
 
-    # add diagonal to adjacency matrix
-    # theta = adj_matrix + np.eye(n)
     # get degree of each node
     degree_vec = np.sum(adj_matrix, axis=0)
 
@@ -54,6 +51,9 @@ def graph_to_precision_matrix(adj_matrix,
     if pos_lims is None:
         rands = np.random.uniform(low=neg_lims[0], high=neg_lims[1],
                                   size=(nnz,))
+    elif neg_lims is None:
+        rands = np.random.uniform(low=pos_lims[0], high=pos_lims[1],
+                                  size=(nnz,))
     else:
         rands = np.zeros(shape=(nnz,))
         boolind = np.random.choice([True, False], size=nnz)
@@ -63,8 +63,33 @@ def graph_to_precision_matrix(adj_matrix,
                                             size=(np.count_nonzero(~boolind),))
     utri[nzind] = rands
 
+    # add 1 to diagonal and copy upper triangle to lower triangle
     theta = np.eye(n) + _copy_triu_to_tril(utri)
 
+    return theta
+
+
+def pcorr_to_prec(theta,
+                  target_condition=50,
+                  eps_bin=1e-2,
+                  num_binary_search=100):
+    """Convert a matrix of correlations to a valid precision matrix.
+
+    TODO: explain condition number minimization
+
+    Arguments
+    --------
+    theta (np.array): square matrix containing partial correlations between
+                      elements
+    target_condition (int): target condition number for added diagonal weight
+    eps_bin (float): convergence condition for condition number search
+    num_binary_search (int): max number of search iterations
+
+    Returns
+    -------
+    theta (np.array): precision matrix (inverse covariance matrix) corresponding
+                      to the input
+    """
     # make sure smallest eigenvalue of matrix isn't 0 (or close to 0)
     # since theta is symmetric, eigenvalues determine condition number
     evals = np.linalg.eig(theta)[0]
@@ -77,8 +102,35 @@ def graph_to_precision_matrix(adj_matrix,
     diag_constant = _bin_search_condition(theta, target_condition,
                                           num_binary_search, eps_bin)
     theta = theta + (diag_constant * np.eye(n))
-
     return theta
+
+
+def prec_to_cov(theta, method='inv'):
+    """Convert a precision matrix to a covariance matrix.
+
+    Arguments
+    ---------
+    theta (np.array): precision matrix
+    method (str): method to use to invert (or pseudoinvert) theta. One of
+                  'inv', 'pinv', 'chol'.
+
+    Returns
+    -------
+    covariance matrix constructed by inverting (or pseudoinverting, etc)
+    the input matrix
+    """
+    if method == 'inv':
+        # just take the inverse, assumes theta is PSD
+        return np.linalg.inv(theta)
+    elif method == 'pinv':
+        # take pseudoinverse, doesn't require theta to be PSD
+        return np.linalg.pinv(theta)
+    elif method == 'chol':
+        # invert theta via Cholesky decomposition/backward substitution
+        # assumes theta is symmetric and positive definite
+        from scipy.linalg import cho_factor, cho_solve
+        I_p = np.eye(theta.shape[0])
+        return cho_solve(cho_factor(theta, lower=True), I_p)
 
 
 def _bin_search_condition(theta, target_cond, num_binary_search, eps_bin):
@@ -133,19 +185,4 @@ def _copy_triu_to_tril(arr):
     Note this overwrites the lower triangle of the existing array.
     """
     return arr + arr.T - np.diag(np.diag(arr))
-
-
-if __name__ == '__main__':
-    adj_matrix = np.array([[0, 1, 1, 0],
-                           [1, 0, 0, 0],
-                           [1, 0, 0, 0],
-                           [0, 0, 0, 0]])
-    theta = graph_to_precision_matrix(adj_matrix,
-                                      pos_lims=None,
-                                      neg_lims=(-0.5, -1.0),
-                                      target_condition=10)
-    print(theta)
-    print(np.linalg.inv(theta))
-    print(theta @ np.linalg.inv(theta))
-    print(np.linalg.cond(theta))
 
